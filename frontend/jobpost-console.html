@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ledger — JobPost Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F1EEE6; --ink:#1C1B19; --ink-soft:#5B5748;
+    --line:#D8D3C6; --accent:#1F5C4F; --accent-ink:#F1EEE6;
+    --danger:#9C3B2E; --panel:#FFFFFF; --tag-bg:#E7E2D3;
+    --font-serif: Newsreader, Georgia, 'Times New Roman', serif;
+    --font-sans: Inter, -apple-system, Segoe UI, Roboto, sans-serif;
+    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#171613; --ink:#EDE9DE; --ink-soft:#9C9683;
+      --line:#3A362E; --accent:#4FA893; --accent-ink:#0E1210;
+      --danger:#E07A66; --panel:#1F1D19; --tag-bg:#2A2721;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#171613; --ink:#EDE9DE; --ink-soft:#9C9683;
+    --line:#3A362E; --accent:#4FA893; --accent-ink:#0E1210;
+    --danger:#E07A66; --panel:#1F1D19; --tag-bg:#2A2721;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sans);}
+  .rail{max-width:880px;margin:0 auto;padding:40px 20px 80px;}
+  h1,h2{font-family:var(--font-serif);font-weight:600;margin:0;}
+  .masthead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:28px;flex-wrap:wrap;gap:10px;}
+  .masthead h1{font-size:30px;font-style:italic;}
+  .masthead small{display:block;font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);letter-spacing:.02em;}
+  button{font-family:var(--font-sans);cursor:pointer;border-radius:3px;border:1px solid var(--ink);background:transparent;color:var(--ink);padding:8px 14px;font-size:13px;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600;}
+  button.ghost{border-color:var(--line);color:var(--ink-soft);}
+  button.link{border:none;padding:2px 4px;color:var(--ink-soft);text-decoration:underline;background:none;}
+  button.link.danger{color:var(--danger);}
+  button:disabled{opacity:.5;cursor:default;}
+  input,textarea,select{font-family:var(--font-sans);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:3px;padding:9px 10px;font-size:14px;width:100%;}
+  textarea{resize:vertical;min-height:70px;}
+  label{font-size:12px;color:var(--ink-soft);display:block;margin-bottom:4px;}
+  .field{margin-bottom:14px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:26px;max-width:380px;margin:60px auto;}
+  .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
+  .err{color:var(--danger);font-size:13px;margin-top:8px;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:24px;}
+  .toolbar .field{margin-bottom:0;flex:1;min-width:150px;}
+  .toolbar .actions{display:flex;gap:8px;}
+  .entry{border-bottom:1px solid var(--line);padding:20px 0;display:flex;gap:18px;}
+  .entry .num{font-family:var(--font-mono);color:var(--ink-soft);font-size:13px;width:28px;flex-shrink:0;padding-top:4px;}
+  .entry .body{flex:1;}
+  .entry h2{font-size:20px;}
+  .entry h2:hover{color:var(--accent);}
+  .entry p{margin:6px 0 10px;color:var(--ink-soft);font-size:14px;line-height:1.5;max-width:60ch;}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .tag{font-family:var(--font-mono);font-size:11px;background:var(--tag-bg);color:var(--ink);padding:3px 7px;border-radius:3px;}
+  .exp{font-family:var(--font-mono);font-size:11px;color:var(--accent);border:1px solid var(--accent);padding:2px 7px;border-radius:3px;}
+  .empty{text-align:center;padding:60px 20px;color:var(--ink-soft);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;padding:60px 16px;overflow:auto;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:28px;max-width:480px;width:100%;}
+  .topline{display:flex;justify-content:space-between;align-items:center;}
+  .switch{font-size:12px;color:var(--ink-soft);text-align:center;margin-top:14px;}
+  .switch button{border:none;background:none;text-decoration:underline;padding:0;color:var(--accent);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+"use strict";
+const { useState, useEffect, useCallback } = React;
+function useApi(baseUrl, auth) {
+    const call = useCallback(async (path, opts = {}) => {
+        const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+        if (auth)
+            headers["Authorization"] = "Basic " + btoa(auth.username + ":" + auth.password);
+        const res = await fetch(baseUrl.replace(/\/$/, "") + "/" + path, { ...opts, headers });
+        const ct = res.headers.get("content-type") || "";
+        if (!res.ok) {
+            let message = "Request failed (" + res.status + ")";
+            try {
+                if (ct.includes("application/json")) {
+                    const data = await res.json();
+                    message = data.message || JSON.stringify(data);
+                }
+                else {
+                    const text = await res.text();
+                    if (text)
+                        message = text;
+                }
+            }
+            catch (e) { /* keep default message */ }
+            throw new Error(message);
+        }
+        return ct.includes("application/json") ? res.json() : res.text();
+    }, [baseUrl, auth]);
+    return call;
+}
+function AuthGate({ baseUrl, setBaseUrl, onAuthed }) {
+    const [mode, setMode] = useState("login");
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [role, setRole] = useState("USER");
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
+    const call = useApi(baseUrl, null);
+    const submit = async (e) => {
+        e.preventDefault();
+        setErr("");
+        setBusy(true);
+        try {
+            if (mode === "register") {
+                await call("register", { method: "POST", body: JSON.stringify({ username, password, role }) });
+                setMode("login");
+                setErr("Account created — sign in below.");
+            }
+            else {
+                const authCall = useApiRaw(baseUrl, { username, password });
+                await authCall("JobPosts");
+                onAuthed({ username, password });
+            }
+        }
+        catch (ex) {
+            setErr(ex.message);
+        }
+        setBusy(false);
+    };
+    function useApiRaw(base, auth) {
+        return async (path) => {
+            const res = await fetch(base.replace(/\/$/, "") + "/" + path, {
+                headers: { Authorization: "Basic " + btoa(auth.username + ":" + auth.password) }
+            });
+            if (!res.ok)
+                throw new Error(res.status === 401 ? "Invalid username or password." : "Could not reach the API at that address.");
+            return res.json();
+        };
+    }
+    return (React.createElement("div", { className: "rail" },
+        React.createElement("div", { className: "masthead" },
+            React.createElement("div", null,
+                React.createElement("h1", null, "Ledger"),
+                React.createElement("small", null, "JobPost console \u2014 companydb"))),
+        React.createElement("div", { className: "card" },
+            React.createElement("h2", { style: { fontSize: 19, marginBottom: 18 } }, mode === "login" ? "Sign in" : "Register an account"),
+            React.createElement("form", { onSubmit: submit },
+                React.createElement("div", { className: "field" },
+                    React.createElement("label", null, "API base URL"),
+                    React.createElement("input", { value: baseUrl, onChange: e => setBaseUrl(e.target.value), placeholder: "http://localhost:8080" })),
+                React.createElement("div", { className: "field" },
+                    React.createElement("label", null, "Username"),
+                    React.createElement("input", { value: username, onChange: e => setUsername(e.target.value), required: true })),
+                React.createElement("div", { className: "field" },
+                    React.createElement("label", null, "Password"),
+                    React.createElement("input", { type: "password", value: password, onChange: e => setPassword(e.target.value), required: true })),
+                mode === "register" &&
+                    React.createElement("div", { className: "field" },
+                        React.createElement("label", null, "Role"),
+                        React.createElement("select", { value: role, onChange: e => setRole(e.target.value) },
+                            React.createElement("option", { value: "USER" }, "USER"),
+                            React.createElement("option", { value: "ADMIN" }, "ADMIN"))),
+                err && React.createElement("div", { className: "err" }, err),
+                React.createElement("button", { className: "primary", style: { width: "100%", marginTop: 6 }, disabled: busy }, busy ? "Working…" : (mode === "login" ? "Sign in" : "Create account"))),
+            React.createElement("div", { className: "switch" }, mode === "login"
+                ? React.createElement(React.Fragment, null,
+                    "No account yet? ",
+                    React.createElement("button", { onClick: () => { setMode("register"); setErr(""); } }, "Register"))
+                : React.createElement(React.Fragment, null,
+                    "Already registered? ",
+                    React.createElement("button", { onClick: () => { setMode("login"); setErr(""); } }, "Sign in"))))));
+}
+function TechTags({ stack }) {
+    return React.createElement("div", { className: "meta" }, (stack || []).map((t, i) => React.createElement("span", { className: "tag", key: i }, t)));
+}
+function PostForm({ initial, onCancel, onSave, busy, err }) {
+    var _a;
+    const [postProfile, setProfile] = useState((initial === null || initial === void 0 ? void 0 : initial.postProfile) || "");
+    const [postDesc, setDesc] = useState((initial === null || initial === void 0 ? void 0 : initial.postDesc) || "");
+    const [reqExperience, setExp] = useState((_a = initial === null || initial === void 0 ? void 0 : initial.reqExperience) !== null && _a !== void 0 ? _a : 0);
+    const [stackText, setStackText] = useState(((initial === null || initial === void 0 ? void 0 : initial.postTechStack) || []).join(", "));
+    const submit = (e) => {
+        e.preventDefault();
+        onSave({
+            postProfile, postDesc,
+            reqExperience: Number(reqExperience),
+            postTechStack: stackText.split(",").map(s => s.trim()).filter(Boolean)
+        });
+    };
+    return (React.createElement("div", { className: "overlay", onClick: (e) => { if (e.target === e.currentTarget)
+            onCancel(); } },
+        React.createElement("div", { className: "modal" },
+            React.createElement("h2", { style: { fontSize: 19, marginBottom: 16 } }, initial ? "Edit position" : "New position"),
+            React.createElement("form", { onSubmit: submit },
+                React.createElement("div", { className: "field" },
+                    React.createElement("label", null, "Profile / title"),
+                    React.createElement("input", { value: postProfile, onChange: e => setProfile(e.target.value), required: true })),
+                React.createElement("div", { className: "field" },
+                    React.createElement("label", null, "Description"),
+                    React.createElement("textarea", { value: postDesc, onChange: e => setDesc(e.target.value), required: true })),
+                React.createElement("div", { className: "field" },
+                    React.createElement("label", null, "Years of experience required"),
+                    React.createElement("input", { type: "number", min: "0", value: reqExperience, onChange: e => setExp(e.target.value), required: true })),
+                React.createElement("div", { className: "field" },
+                    React.createElement("label", null, "Tech stack (comma separated, 1\u201310)"),
+                    React.createElement("input", { value: stackText, onChange: e => setStackText(e.target.value), placeholder: "Java, Spring, SQL", required: true })),
+                err && React.createElement("div", { className: "err" }, err),
+                React.createElement("div", { className: "row-actions" },
+                    React.createElement("button", { type: "button", className: "ghost", onClick: onCancel }, "Cancel"),
+                    React.createElement("button", { className: "primary", disabled: busy }, busy ? "Saving…" : "Save position"))))));
+}
+function DetailView({ job, loading, err, onClose, onEdit }) {
+    return (React.createElement("div", { className: "overlay", onClick: (e) => { if (e.target === e.currentTarget)
+            onClose(); } },
+        React.createElement("div", { className: "modal" },
+            loading && React.createElement("p", { style: { color: "var(--ink-soft)" } }, "Fetching position\u2026"),
+            err && React.createElement("div", { className: "err" }, err),
+            job && React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "topline", style: { marginBottom: 14 } },
+                    React.createElement("span", { className: "tag" },
+                        "POST #",
+                        job.postId)),
+                React.createElement("h2", { style: { fontSize: 22, marginBottom: 8 } }, job.postProfile),
+                React.createElement("p", { style: { color: "var(--ink-soft)", lineHeight: 1.6 } }, job.postDesc),
+                React.createElement("div", { className: "meta", style: { margin: "14px 0" } },
+                    React.createElement("span", { className: "exp" },
+                        job.reqExperience,
+                        "+ yrs"),
+                    React.createElement(TechTags, { stack: job.postTechStack }))),
+            React.createElement("div", { className: "row-actions" },
+                React.createElement("button", { className: "ghost", onClick: onClose }, "Close"),
+                job && React.createElement("button", { className: "primary", onClick: () => onEdit(job) }, "Edit this position")))));
+}
+function Console({ baseUrl, auth, onSignOut }) {
+    const call = useApi(baseUrl, auth);
+    const [jobs, setJobs] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [viewing, setViewing] = useState(null); // {} while loading, then the fetched job
+    const [viewErr, setViewErr] = useState("");
+    const [viewLoading, setViewLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [keyword, setKeyword] = useState("");
+    const [maxExp, setMaxExp] = useState("");
+    const [editing, setEditing] = useState(null); // {} for new, job object for edit
+    const [formErr, setFormErr] = useState("");
+    const [formBusy, setFormBusy] = useState(false);
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            let data;
+            if (keyword.trim())
+                data = await call("JobPost/keyword/" + encodeURIComponent(keyword.trim()));
+            else if (maxExp !== "")
+                data = await call("JobPost/experience/" + Number(maxExp));
+            else
+                data = await call("JobPosts");
+            setJobs(data);
+        }
+        catch (ex) {
+            setError(ex.message);
+        }
+        setLoading(false);
+    }, [call, keyword, maxExp]);
+    useEffect(() => { load(); }, []);
+    const runSearch = (e) => { e.preventDefault(); load(); };
+    const seed = async () => {
+        setError("");
+        try {
+            await call("JobPost/load", { method: "POST" });
+            load();
+        }
+        catch (ex) {
+            setError(ex.message);
+        }
+    };
+    const remove = async (id) => {
+        if (!window.confirm("Delete this position? This can't be undone."))
+            return;
+        try {
+            await call("JobPost/" + id, { method: "DELETE" });
+            load();
+        }
+        catch (ex) {
+            setError(ex.message);
+        }
+    };
+    const openDetail = async (id) => {
+        setViewing({});
+        setViewErr("");
+        setViewLoading(true);
+        try {
+            const job = await call("JobPost/" + id); // GET /JobPost/{Jobid}
+            setViewing(job);
+        }
+        catch (ex) {
+            setViewErr(ex.message);
+        }
+        setViewLoading(false);
+    };
+    const save = async (payload) => {
+        setFormBusy(true);
+        setFormErr("");
+        try {
+            if (editing && editing.postId != null) {
+                await call("JobPost/" + editing.postId, { method: "PUT", body: JSON.stringify(payload) });
+            }
+            else {
+                await call("JobPost", { method: "POST", body: JSON.stringify(payload) });
+            }
+            setEditing(null);
+            load();
+        }
+        catch (ex) {
+            setFormErr(ex.message);
+        }
+        setFormBusy(false);
+    };
+    return (React.createElement("div", { className: "rail" },
+        React.createElement("div", { className: "masthead" },
+            React.createElement("div", null,
+                React.createElement("h1", null, "Ledger"),
+                React.createElement("small", null,
+                    auth.username,
+                    " \u00B7 ",
+                    baseUrl)),
+            React.createElement("button", { className: "ghost", onClick: onSignOut }, "Sign out")),
+        React.createElement("form", { className: "toolbar", onSubmit: runSearch },
+            React.createElement("div", { className: "field" },
+                React.createElement("label", null, "Search profile or description"),
+                React.createElement("input", { value: keyword, onChange: e => { setKeyword(e.target.value); if (e.target.value)
+                        setMaxExp(""); }, placeholder: "e.g. engineer" })),
+            React.createElement("div", { className: "field" },
+                React.createElement("label", null, "Max years experience"),
+                React.createElement("input", { type: "number", min: "0", value: maxExp, onChange: e => { setMaxExp(e.target.value); if (e.target.value)
+                        setKeyword(""); }, placeholder: "e.g. 3" })),
+            React.createElement("div", { className: "actions" },
+                React.createElement("button", { className: "ghost", type: "submit" }, "Filter"),
+                React.createElement("button", { className: "ghost", type: "button", onClick: () => { setKeyword(""); setMaxExp(""); load(); } }, "Reset"),
+                React.createElement("button", { className: "ghost", type: "button", onClick: seed }, "Load sample data"),
+                React.createElement("button", { className: "primary", type: "button", onClick: () => { setFormErr(""); setEditing({}); } }, "New position"))),
+        error && React.createElement("div", { className: "err", style: { marginBottom: 16 } }, error),
+        loading && React.createElement("p", { style: { color: "var(--ink-soft)" } }, "Loading positions\u2026"),
+        !loading && jobs && jobs.length === 0 &&
+            React.createElement("div", { className: "empty" },
+                React.createElement("h2", { style: { fontSize: 18 } }, "No positions here."),
+                React.createElement("p", null, "Try clearing your filters, or add the first one.")),
+        !loading && jobs && jobs.map((j, i) => (React.createElement("div", { className: "entry", key: j.postId },
+            React.createElement("div", { className: "num" }, String(i + 1).padStart(2, "0")),
+            React.createElement("div", { className: "body" },
+                React.createElement("h2", { style: { cursor: "pointer" }, onClick: () => openDetail(j.postId) }, j.postProfile),
+                React.createElement("p", null, j.postDesc),
+                React.createElement("div", { className: "meta" },
+                    React.createElement("span", { className: "exp" },
+                        j.reqExperience,
+                        "+ yrs"),
+                    React.createElement(TechTags, { stack: j.postTechStack })),
+                React.createElement("div", { className: "row-actions", style: { justifyContent: "flex-start", marginTop: 10 } },
+                    React.createElement("button", { className: "link", onClick: () => { setFormErr(""); setEditing(j); } }, "Edit"),
+                    React.createElement("button", { className: "link danger", onClick: () => remove(j.postId) }, "Delete")))))),
+        editing && React.createElement(PostForm, { initial: editing.postId != null ? editing : null, busy: formBusy, err: formErr, onCancel: () => setEditing(null), onSave: save }),
+        viewing && React.createElement(DetailView, { job: viewing.postId != null ? viewing : null, loading: viewLoading, err: viewErr, onClose: () => setViewing(null), onEdit: (j) => { setViewing(null); setFormErr(""); setEditing(j); } })));
+}
+function App() {
+    const [baseUrl, setBaseUrl] = useState(() => {
+        try {
+            return localStorage.getItem("jobpost-base-url") || "http://localhost:8080";
+        }
+        catch (e) {
+            return "http://localhost:8080";
+        }
+    });
+    const [auth, setAuth] = useState(null);
+    useEffect(() => { try {
+        localStorage.setItem("jobpost-base-url", baseUrl);
+    }
+    catch (e) { } }, [baseUrl]);
+    return auth
+        ? React.createElement(Console, { baseUrl: baseUrl, auth: auth, onSignOut: () => setAuth(null) })
+        : React.createElement(AuthGate, { baseUrl: baseUrl, setBaseUrl: setBaseUrl, onAuthed: setAuth });
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
+</script>
+</body>
+</html>
